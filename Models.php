@@ -14,9 +14,41 @@ class Model {
 		
 	protected $use_table = NULL;
 	protected $columns = array();
+	protected $validators = array();
 	
 	public function __constructor() {
 		$this->db = new PDO('sqlite:blog_db.sqlite');
+		$this->schema();
+		$this->setValidators();
+	}
+	
+	private function setValidators() {
+		foreach($this->validators as $field => $dators) { //dator, it's slang for validator, word.
+			if($col = $this->columns[$field]) {
+				foreach($dators as $type) {
+					$validator = NULL;
+					if($type instanceof Validates) {
+						$validator = $type;
+					} else {
+						switch($type) {
+							case 'required':
+								$validator = new Required();
+								break;
+							case 'alphanumeric':
+								$validator = new AlphaNumeric();
+								break;
+							case 'alpha':
+								$validator = new Alpha();
+								break;
+							case 'numeric':
+								$validator = new Numeric();
+								break;
+						}
+					}
+					$col->addValidator($validator);
+				}
+			}
+		}
 	}
 	
 	public function __get($name) {

@@ -1,0 +1,9 @@
+models + sqlite = modelite
+
+class Posts extends Model {
+
+    $validators = array(
+        'title' => array('required', 'alphanumeric') 
+        'body' => array('required'));
+
+}
