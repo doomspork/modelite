@@ -4,6 +4,13 @@ class Posts extends Model {
 
     $validators = array(
         'title' => array('required', 'alphanumeric') 
-        'body' => array('required'));
+        'body' => array('required')
+        'slug' => array(new CustomValidator()));
 
 }
+
+$posts = Posts::find(1) #id
+
+$posts = Posts::find(array('title' => 'First Post'), array('limit' => 5));
+
+$posts = Posts::find(array('or' => array('title' => 'First Post', 'slug' => 'second-post-slug')));
