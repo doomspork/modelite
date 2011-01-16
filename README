@@ -1,5 +1,12 @@
 models + sqlite = modelite
 
+#roadmap
++ relationships!
++ ????
++ PROFIT!
+
+#examples
+
 class Posts extends Model {
 
     $validators = array(
@@ -9,7 +16,7 @@ class Posts extends Model {
 
 }
 
-$posts = Posts::find(1) #id
+$posts = Posts::find(1) #id (sqlites rowid)
 
 $posts = Posts::find(array('title' => 'First Post'), array('limit' => 5));
 
