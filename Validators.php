@@ -11,7 +11,7 @@ class Required implements Validates {
 	}
 	
 	public function getMessage() {
-		return '';
+		return 'This $field is required.';
 	}
 }
 
@@ -38,7 +38,7 @@ class AlphaNumeric implements Validates {
 	}
 	
 	public function getMessage() {
-		return '';
+		return '$field must be alpha numeric.';
 	}
 }
 
@@ -49,7 +49,7 @@ class Alpha extends BaseValidator {
 	}
 	
 	public function getMessage() {
-		return '';
+		return '$field must contain only alpha characters';
 	}
 }
 
@@ -60,7 +60,7 @@ class Numeric extends BaseValidator {
 	}
 	
 	public function getMessage() {
-		return '';
+		return '$field must contain only numeric values';
 	}
 }
 ?>

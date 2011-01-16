@@ -26,7 +26,7 @@ class Column {
 	public function validate(&$errors) {
 		foreach($this->validators as $validator) {
 			if($validator->isValid($this) == FALSE) {
-				array_push($errors, $validator->getMessage());
+				array_push($errors, str_replace('$field', $this->name, $validator->getMessage()));
 				return FALSE;
 			}
 		}
