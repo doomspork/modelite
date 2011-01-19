@@ -43,6 +43,15 @@ class Model {
 							case 'numeric':
 								$validator = new Numeric();
 								break;
+							default:
+								try {
+									$clz = new ReflectionClass($type);
+									$instance = $clz->newInstance();
+									$validator = $instance;
+								} catch (ReflectionException $exception) {
+									// Should this project utilize lumberjack?
+								}
+								break;
 						}
 					}
 					$col->addValidator($validator);

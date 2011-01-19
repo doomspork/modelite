@@ -16,7 +16,7 @@ class Posts extends Model {
 
 }
 
-$posts = Posts::find(1) #id (sqlites rowid)
+$posts = Posts::find(1) #id (sqlite's rowid)
 
 $posts = Posts::find(array('title' => 'First Post'), array('limit' => 5));
 
