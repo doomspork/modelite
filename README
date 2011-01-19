@@ -1,5 +1,7 @@
 models + sqlite = modelite
 
+Currently only supports PHP >= 5.3, sorry.
+
 #roadmap
 + relationships!
 + ????

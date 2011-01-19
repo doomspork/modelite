@@ -25,13 +25,16 @@ abstract class BaseValidator implements Validates {
 	public function isValid($value) {
 		return preg_match($this->pattern, $value);
 	}
-	
-	abstract public function getMessage();
 }
 
 class AlphaNumeric implements Validates {
-	private static $alpha = new Alpha();
-	private static $numeric = new Numeric();
+	private static $alpha = NULL;
+	private static $numeric = NULL;
+	
+	public function __constructor() {
+		$this->alpha = new Alpha();
+		$this->numeric = new Numeric();	
+	}
 	
 	public function isValid($value) {
 		return AlphaNumeric::$alpha->isValid($value) || AlphaNumeric::$numeric->isValid($value);

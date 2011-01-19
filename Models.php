@@ -6,18 +6,24 @@ class Model {
 	
 	private $db = NULL;
 	
+	protected $has_one = array();
+	protected $has_many = array();
+	protected $belongs_to = array();
+	protected $habtm = array();
+	
 	protected static $query_options = array(
-		'limit' => 'return "LIMIT BY $parameter"',
-		'group' => 'return "GROUP BY $parameter"',
-		'desc' => 'return "ORDER BY $parameter DESC"',
-		'asc' => 'return "ORDER BY $parameter ASC"');
+		'limit' => 'return "LIMIT $parameter";',
+		'group' => 'return "GROUP BY $parameter";',
+		'desc' => 'return "ORDER BY $parameter DESC";',
+		'asc' => 'return "ORDER BY $parameter ASC";');
 		
 	protected $use_table = NULL;
 	protected $columns = array();
 	protected $validators = array();
 	
 	public function __constructor() {
-		$this->db = new PDO('sqlite:blog_db.sqlite');
+		$model_name =  get_called_class();
+		$this->db = new PDO('sqlite:' . $model_name::SQLITE);
 		$this->schema();
 		$this->setValidators();
 	}
@@ -74,18 +80,20 @@ class Model {
 		}
 	}
 	
-	public static function all($fields = NULL, $options = array()) {
-		$clz = get_class($this);
-		return $clz::find($fields, $options);
+	public static function all($options = array()) {
+		return self::find(array(1 => 1), $options);
 	}
 	
 	public static function first($fields = NULL, $options = array()) {
-		$clz = get_class($this);
-		return $clz::find($fields, $options);
+		$options['limit'] = 1;
+		if($fields == NULL) {
+			return self::all($options);
+		}
+		return self::find($fields, $options);
 	}
 	
 	public static function find($fields = NULL, $options = array()) {
-		$model_name = get_class($this);
+		$model_name = get_called_class();
 		if($fields == NULL) 
 			return NULL;
 			
@@ -99,20 +107,22 @@ class Model {
 		$query = 'SELECT rowid, * FROM ' . $model_name . ' WHERE ' . $where;
 		foreach($options as $option => $parameters) {
 			if(array_key_exists($option, Model::$query_options)) {
-				$func = create_function('$parameters', Model::$query_options[$option]);
+				$func = create_function('$parameter', Model::$query_options[$option]);
 				$query .= ' ' . $func($parameters);
 			}
 		}
-		$results = $db->query($query);
-		$models = array();
-		foreach($results->fetchAll(PDO::FETCH_ASSOC) as $result) {
-			$model = new $model_name();
-			foreach($result as $name => $value) {
-				$model->$name = $value;
+		if(($results = $db->query($query)) != NULL) {
+			$models = array();
+			foreach($results->fetchAll(PDO::FETCH_ASSOC) as $result) {
+				$clz = new ReflectionClass($model_name);
+				$model = $clz->newInstance();
+				$model->__constructor(); //This is unacceptable.  Why is the constructor not being called through $model_name() or reflection?!
+				foreach($result as $name => $value) {
+					$model->$name = $value;
+				}
+				array_push($models, $model);
 			}
-			array_push($models, $model);
 		}
-		
 		return (count($models) > 1) ? $models : $models[0];
 	}
 	
@@ -139,7 +149,7 @@ class Model {
 		return ($rows == 1) ? TRUE : FALSE;
 	}
 	
-	private function walk(&$value, $key) {
+	protected function walk(&$value, $key) {
 		if(strtolower($key) == 'or' && is_array($value)) {
 			array_walk($value, array(__CLASS__, 'walk'));
 			$value = implode(' OR ', $value);
@@ -177,6 +187,12 @@ class Model {
 				$this->columns[$column['name']] = $col;
 			}
 		}
+		//Add in rowid here for now
+		$id = new Column();
+		$id->primary_key = TRUE;
+		$id->notnull = FALSE;
+		$this->columns['rowid'] = $id;
+		
 		return $this->columns;
 	}
 }
