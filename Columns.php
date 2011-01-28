@@ -34,15 +34,12 @@ class Column {
 	}
 	
 	public function __get($name) {
-		$value = NULL;
-		switch(strtolower($name)) {
-			case 'modified':
-				$this->value = time();
-				break;
-			case 'created':
-				$this->value = ($this->value == NULL) ? time() : $this->value;
-				break;
+		/*if($name == 'value') {
+			if(strtolower($this->type) == 'text') {
+				return '"' . $this->value . '"';
+			}
 		}
+		*/
 		return $this->$name;
 	}
 	

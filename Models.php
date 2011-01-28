@@ -21,7 +21,7 @@ class Model {
 	protected $columns = array();
 	protected $validators = array();
 	
-	public function __constructor() {
+	public function __construct() {
 		$model_name =  get_called_class();
 		$this->db = new PDO('sqlite:' . $model_name::SQLITE);
 		$this->schema();
@@ -67,15 +67,24 @@ class Model {
 	}
 	
 	public function __get($name) {
+		//$name = ucfirst($name);
 		if(array_key_exists($name, $this->columns)) {
 			return $this->columns[$name];
+		} else if (in_array($name, $this->has_one)) {
+			return $name::first(array(strtolower(get_called_class()) . '_id' => $this->rowid->value));
+		} else if (in_array(ucfirst($name), $this->has_many)) {
+			$results = $name::find(array(strtolower(get_called_class()) . '_id' => $this->rowid->value));
+			return (is_array($results)) ? $results : array($results);
+		} else if(in_array($name, $this->belongs_to)) {
+			$field = $name . '_id';
+			return $name::first($this->$field->value);
 		}
 		return NULL;
 	}
 	
 	public function __set($name, $value) {
-		$col = $this->__get($name);
-		if($col != NULL) {
+		if(array_key_exists($name, $this->columns)) {
+			$col = $this->columns[$name];
 			$col->value = $value;
 		}
 	}
@@ -91,6 +100,7 @@ class Model {
 		}
 		return self::find($fields, $options);
 	}
+	
 	
 	public static function find($fields = NULL, $options = array()) {
 		$model_name = get_called_class();
@@ -116,7 +126,6 @@ class Model {
 			foreach($results->fetchAll(PDO::FETCH_ASSOC) as $result) {
 				$clz = new ReflectionClass($model_name);
 				$model = $clz->newInstance();
-				$model->__constructor(); //This is unacceptable.  Why is the constructor not being called through $model_name() or reflection?!
 				foreach($result as $name => $value) {
 					$model->$name = $value;
 				}
@@ -127,13 +136,13 @@ class Model {
 	}
 	
 	public function save() {
-		$table = ($this->use_table == NULL) ? __CLASS__ : $this->use_table;
-		$cols = array_map(create_function('$c', 'if($c->name != "rowid") return $c;'), $this->columns);
-		$names = array_keys($this->columns);
-		$values = array_map(create_function('$c', 'return $c->value;'), $this->columns);
-		
+		$table = ($this->use_table == NULL) ? get_called_class() : $this->use_table;
+		$cols = $this->columns;
+		unset($cols['rowid']);
+		$values = array_map(create_function('$c', 'return $c->value;'), $cols);
+		$rows = 0;
 		if(isset($id)) {
-			$name_str = join(',', $name);
+			$name_str = join(',', array_keys($values));
 			$value_str = join(',', $values);
 			$insert_str = array();
 			for($i = 0 ; $i < count($name_str) ; $i++) {
@@ -142,8 +151,11 @@ class Model {
 			$insert_str = join(',', $insert_str);
 			$rows = $this->db->exec('UPDATE ' . $table . ' SET (' . $insert_str . ') WHERE rowid = ' . $this->columns['id']->value);
 		} else {
-			$name_str = join(',', $name);
-			$value_str = join(',', $values);
+			if(array_key_exists('created', $values)) {
+				$values['created'] = time();
+			}
+			$name_str = join(',', array_keys($values));
+			$value_str = join(',', array_values($values));
 			$rows = $this->db->exec('INSERT INTO ' . $table . '(' . $name_str .') VALUES (' . $value_str . ')');
 		}
 		return ($rows == 1) ? TRUE : FALSE;
@@ -151,7 +163,7 @@ class Model {
 	
 	protected function walk(&$value, $key) {
 		if(strtolower($key) == 'or' && is_array($value)) {
-			array_walk($value, array(__CLASS__, 'walk'));
+			array_walk($value, array(get_called_class(), 'walk'));
 			$value = implode(' OR ', $value);
 		} else {
 			if(is_array($value)) {
@@ -165,7 +177,7 @@ class Model {
 	
 	public function schema() {
 		if(empty($this->columns)) {
-			$stm = $this->db->query('PRAGMA table_info(Posts)');
+			$stm = $this->db->query('PRAGMA table_info('. get_called_class() .')');
 			foreach($stm->fetchAll(PDO::FETCH_ASSOC) as $column) {
 				$col = new Column();
 				foreach($column as $key => $value) {
@@ -191,6 +203,7 @@ class Model {
 		$id = new Column();
 		$id->primary_key = TRUE;
 		$id->notnull = FALSE;
+		$id->name = 'rowid';
 		$this->columns['rowid'] = $id;
 		
 		return $this->columns;
