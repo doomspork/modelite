@@ -56,6 +56,7 @@ class Model {
 									$validator = $instance;
 								} catch (ReflectionException $exception) {
 									// Should this project utilize lumberjack?
+									// For the time being, eat exceptions here.
 								}
 								break;
 						}
@@ -66,10 +67,22 @@ class Model {
 		}
 	}
 	
+	public function value($field) {
+		$col = $this->column($field);
+		return ($col == NULL) ? NULL : $col->value
+	}
+	
+	public function column($field) {
+		if(array_key_exists($field, $this->columns)) {
+			return $this->columns[$field];
+		}
+		return NULL;
+	}
+	
 	public function __get($name) {
 		//$name = ucfirst($name);
 		if(array_key_exists($name, $this->columns)) {
-			return $this->columns[$name];
+			return $this->value($name);
 		} else if (in_array($name, $this->has_one)) {
 			return $name::first(array(strtolower(get_called_class()) . '_id' => $this->rowid->value));
 		} else if (in_array(ucfirst($name), $this->has_many)) {
@@ -82,11 +95,19 @@ class Model {
 		return NULL;
 	}
 	
+	
 	public function __set($name, $value) {
 		if(array_key_exists($name, $this->columns)) {
 			$col = $this->columns[$name];
 			$col->value = $value;
 		}
+	}
+	
+	public static function query($query_stmt) {
+		if(preg_match('/^INSERT|UPDATE|DELETE.*', $query_stmt)){
+			return $db->exec($query_stmt);
+		}
+		return $db->query($query_stmt);
 	}
 	
 	public static function all($options = array()) {
@@ -113,7 +134,6 @@ class Model {
 		
 		$where = join((count($fields) > 1) ? ' AND ' : '', $fields);
 		
-		$db = new PDO('sqlite:' . $model_name::SQLITE);
 		$query = 'SELECT rowid, * FROM ' . $model_name . ' WHERE ' . $where;
 		foreach($options as $option => $parameters) {
 			if(array_key_exists($option, Model::$query_options)) {
@@ -121,7 +141,7 @@ class Model {
 				$query .= ' ' . $func($parameters);
 			}
 		}
-		if(($results = $db->query($query)) != NULL) {
+		if(($results = $this->query($query)) != NULL) {
 			$models = array();
 			foreach($results->fetchAll(PDO::FETCH_ASSOC) as $result) {
 				$clz = new ReflectionClass($model_name);
@@ -149,14 +169,14 @@ class Model {
 				array_push($insert_str, $name_str[$i] . '=' . $value_str[$i]);
 			}
 			$insert_str = join(',', $insert_str);
-			$rows = $this->db->exec('UPDATE ' . $table . ' SET (' . $insert_str . ') WHERE rowid = ' . $this->columns['id']->value);
+			$rows = $this->query('UPDATE ' . $table . ' SET (' . $insert_str . ') WHERE rowid = ' . $this->value('rowid'));
 		} else {
 			if(array_key_exists('created', $values)) {
 				$values['created'] = time();
 			}
 			$name_str = join(',', array_keys($values));
 			$value_str = join(',', array_values($values));
-			$rows = $this->db->exec('INSERT INTO ' . $table . '(' . $name_str .') VALUES (' . $value_str . ')');
+			$rows = $this->query('INSERT INTO ' . $table . '(' . $name_str .') VALUES (' . $value_str . ')');
 		}
 		return ($rows == 1) ? TRUE : FALSE;
 	}
@@ -169,8 +189,12 @@ class Model {
 			if(is_array($value)) {
 				$value = "$key IN (" . implode(',', $value) . ")";
 			} else {
-				$val = is_string($value) ? "'$value'" : $value; 
-				$value = "$key = $val";		
+				$operator = '=';
+				if(preg_match('/([><=]{1,2})$/', $val, $operator)) {
+					$operator = $operator[1];
+				}
+				$val = is_string($value) ? '"' . $value . '"' : $value;
+				$value = $key . $operator . $val;		
 			}
 		}	
 	}

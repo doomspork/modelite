@@ -34,12 +34,6 @@ class Column {
 	}
 	
 	public function __get($name) {
-		/*if($name == 'value') {
-			if(strtolower($this->type) == 'text') {
-				return '"' . $this->value . '"';
-			}
-		}
-		*/
 		return $this->$name;
 	}
 	
