@@ -13,24 +13,24 @@ class Column {
 	
 	protected $validators = array();
 
-	public function __constructor($name = NULL) {
+	public function __construct($name = NULL) {
 		$this->name = $name;
 	}
 	
-	public function addValidator(ColumnValidator $validator) {
+	public function addValidator(Validates $validator) {
 		if(in_array($validator, $this->validators) == FALSE) {
 			array_push($this->validators, $validator);
 		}
 	}
 	
-	public function validate(&$errors) {
+	public function validate() {
+		$errors = array();
 		foreach($this->validators as $validator) {
-			if($validator->isValid($this) == FALSE) {
-				array_push($errors, str_replace('$field', $this->name, $validator->getMessage()));
-				return FALSE;
+			if($validator->isValid($this->value) == FALSE) {
+				array_push($errors, $validator->getMessage());
 			}
 		}
-		return TRUE;
+		return empty($errors) ? TRUE : array($this->name => $errors);
 	}
 	
 	public function __get($name) {

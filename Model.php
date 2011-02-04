@@ -1,6 +1,5 @@
 <?php
-
-require_once 'Columns.php';
+require_once 'Column.php';
 
 class Model {
 	
@@ -18,48 +17,38 @@ class Model {
 		'asc' => 'return "ORDER BY $parameter ASC";');
 		
 	protected $use_table = NULL;
-	protected $columns = array();
 	protected $validators = array();
+	protected $columns = array();
 	
-	public function __construct() {
+	public function __construct($use_schema = TRUE) {
 		$model_name =  get_called_class();
-		$this->db = new PDO('sqlite:' . $model_name::SQLITE);
-		$this->schema();
+		if($use_schema) {
+			$this->db = new PDO('sqlite:' . $model_name::SQLITE);
+			$this->schema();
+		}
 		$this->setValidators();
 	}
 	
 	private function setValidators() {
+		$registry = ValidatorRegistry::instance();
 		foreach($this->validators as $field => $dators) { //dator, it's slang for validator, word.
-			if($col = $this->columns[$field]) {
+			$col = $this->columns[$field]; 
+			if($col != FALSE) {
+				$dators = is_array($dators) ? $dators : array($dators);
 				foreach($dators as $type) {
 					$validator = NULL;
 					if($type instanceof Validates) {
 						$validator = $type;
 					} else {
-						switch($type) {
-							case 'required':
-								$validator = new Required();
-								break;
-							case 'alphanumeric':
-								$validator = new AlphaNumeric();
-								break;
-							case 'alpha':
-								$validator = new Alpha();
-								break;
-							case 'numeric':
-								$validator = new Numeric();
-								break;
-							default:
-								try {
-									$clz = new ReflectionClass($type);
-									$instance = $clz->newInstance();
-									$validator = $instance;
-								} catch (ReflectionException $exception) {
-									// Should this project utilize lumberjack?
-									// For the time being, eat exceptions here.
-								}
-								break;
+						$name = $type;
+						$options;
+						$clz = NULL;
+						if(is_array($type)) {
+							$name = key($type);
+							$options = $type[$name];
 						}
+						$clz = ($registry->contains($name)) ? $registry->get($name) : new ReflectionClass($name);
+						$validator = $clz->newInstance($options);
 					}
 					$col->addValidator($validator);
 				}
@@ -69,7 +58,7 @@ class Model {
 	
 	public function value($field) {
 		$col = $this->column($field);
-		return ($col == NULL) ? NULL : $col->value
+		return ($col == NULL) ? NULL : $col->value;
 	}
 	
 	public function column($field) {
@@ -80,7 +69,6 @@ class Model {
 	}
 	
 	public function __get($name) {
-		//$name = ucfirst($name);
 		if(array_key_exists($name, $this->columns)) {
 			return $this->value($name);
 		} else if (in_array($name, $this->has_one)) {
@@ -103,6 +91,16 @@ class Model {
 		}
 	}
 	
+	public function validate() {
+		$errors = array();
+		foreach($this->columns as $column) {
+			if(is_array($message = $column->validate())){
+				$errors = array_merge($errors, $message);
+			}
+		}
+		return empty($errors) ? TRUE : $errors;
+	}
+	
 	public static function query($query_stmt) {
 		if(preg_match('/^INSERT|UPDATE|DELETE.*', $query_stmt)){
 			return $db->exec($query_stmt);
@@ -112,6 +110,12 @@ class Model {
 	
 	public static function all($options = array()) {
 		return self::find(array(1 => 1), $options);
+	}
+	
+	public static function count($fields = array()) {
+		$model_name = get_called_class();
+		$where = join((count($fields) > 1) ? ' AND ' : '', $fields);
+		return self::query('SELECT count(*) FROM ' . $model_name . ' WHERE ' . $where);
 	}
 	
 	public static function first($fields = NULL, $options = array()) {
@@ -159,7 +163,7 @@ class Model {
 		$table = ($this->use_table == NULL) ? get_called_class() : $this->use_table;
 		$cols = $this->columns;
 		unset($cols['rowid']);
-		$values = array_map(create_function('$c', 'return $c->value;'), $cols);
+		$values = array_map(create_function('$c', 'return $c->value;'), $cols);  //This can be accomplished with the new methods
 		$rows = 0;
 		if(isset($id)) {
 			$name_str = join(',', array_keys($values));
@@ -203,6 +207,11 @@ class Model {
 		if(empty($this->columns)) {
 			$stm = $this->db->query('PRAGMA table_info('. get_called_class() .')');
 			foreach($stm->fetchAll(PDO::FETCH_ASSOC) as $column) {
+				
+				if(in_array($column['name'], $this->columns)) {
+					//Allow people to assign custom column types to a field
+				}
+				
 				$col = new Column();
 				foreach($column as $key => $value) {
 					switch($key) {
